@@ -17,11 +17,26 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.pdfbox.cos.COSArray;
+import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDObjectReference;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureElement;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureTreeRoot;
+import org.apache.pdfbox.pdmodel.documentinterchange.markedcontent.PDMarkedContent;
+import org.apache.pdfbox.pdmodel.documentinterchange.markedcontent.PDPropertyList;
+import org.apache.pdfbox.pdmodel.documentinterchange.taggedpdf.StandardStructureTypes;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageXYZDestination;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 
@@ -392,7 +407,71 @@ public abstract class Table<T extends PDPage> {
                         cursorX += cell.getHorizontalFreeSpace();
                         break;
                 }
+
+                boolean hasAltText = imageCell.getAlternateText() != null && !imageCell.getAlternateText().isEmpty();
+                System.out.println("Has Alt test: " + hasAltText);
+                COSDictionary dictionary = new COSDictionary();
+                dictionary.setInt(COSName.MCID, 123);
+
+                if (hasAltText) {
+                    tableContentStream.beginMarkedContent(COSName.IMAGE, PDPropertyList.create(dictionary));
+
+                    PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
+                    PDStructureElement structureElement = new PDStructureElement(StandardStructureTypes.Figure, treeRoot);
+                    structureElement.setPage(currentPage);
+
+                    structureElement.setAlternateDescription(imageCell.getAlternateText());
+
+                    // Set alt text on marked content for structure.
+                    // This is the dictionary with the mcid used in beginMarkedContent.
+                    dictionary.setString(COSName.ALT, imageCell.getAlternateText());
+
+                    PDMarkedContent markedImg = new PDMarkedContent(COSName.IMAGE, dictionary);
+                    markedImg.addXObject(imageCell.getImage().getImageXObject());
+                    structureElement.appendKid(markedImg);
+                }
+
                 imageCell.getImage().draw(document, tableContentStream, cursorX, cursorY);
+
+                if (hasAltText) {
+                    tableContentStream.endMarkedContent();
+                }
+
+                if (imageCell.getUrl() != null) {
+                    List<PDAnnotation> annotations = ((PDPage)currentPage).getAnnotations();
+
+                    PDBorderStyleDictionary borderULine = new PDBorderStyleDictionary();
+                    borderULine.setStyle(PDBorderStyleDictionary.STYLE_UNDERLINE);
+
+                    PDAnnotationLink txtLink = new PDAnnotationLink();
+                    if (imageCell.getDrawUrlLine()) {
+                        borderULine.setWidth(1); // 1 point
+                        txtLink.setBorderStyle(borderULine);
+                    } else {
+                        borderULine.setWidth(0);
+                        txtLink.setBorderStyle(borderULine);
+                        txtLink.setBorder(new COSArray());
+                    }
+
+                    // Set the rectangle containing the link
+                    // PDRectangle sets a the x,y and the width and height extend upwards from that!
+                    PDRectangle position = new PDRectangle(cursorX, cursorY, (float)(imageCell.getImage().getWidth()), -(float)(imageCell.getImage().getHeight()));
+                    txtLink.setRectangle(position);
+
+                    // add an action
+                    PDActionURI action = new PDActionURI();
+                    action.setURI(imageCell.getUrl().toString());
+                    txtLink.setAction(action);
+                    annotations.add(txtLink);
+
+                    PDObjectReference pd = new PDObjectReference();
+                    pd.setReferencedObject(txtLink);
+                    PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
+                    PDStructureElement structureElement = new PDStructureElement(StandardStructureTypes.P, treeRoot);
+                    structureElement.appendKid(pd);
+                    treeRoot.appendKid(structureElement);
+                }
+
 
             } else if (cell instanceof TableCell) {
                 final TableCell<T> tableCell = (TableCell<T>) cell;

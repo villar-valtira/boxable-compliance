@@ -12,6 +12,8 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 	
 	private final VerticalAlignment valign;
 
+	private String alternateText;
+
 	ImageCell(Row<T> row, float width, Image image, boolean isCalculated) {
 		super(row, width, null, isCalculated);
 		this.img = image;
@@ -62,5 +64,13 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 	 */
 	public Image getImage() {
 		return img;
+	}
+
+	public String getAlternateText() {
+		return alternateText;
+	}
+
+	public void setAlternateText(String alternateText) {
+		this.alternateText = alternateText;
 	}
 }

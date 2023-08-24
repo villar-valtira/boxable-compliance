@@ -1,6 +1,10 @@
 package be.quodlibet.boxable.utils;
 
+import org.apache.pdfbox.cos.COSBase;
+import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.documentinterchange.markedcontent.PDPropertyList;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.util.Matrix;
@@ -53,6 +57,17 @@ public class PageContentStreamOptimized {
             pageContentStream.endText();
             textMode = false;
         }
+    }
+
+    public void beginMarkedContent(COSName cosName) throws IOException {
+        pageContentStream.beginMarkedContent(cosName);
+    }
+    public void beginMarkedContent(COSName cosName, PDPropertyList propertyList) throws IOException {
+        pageContentStream.beginMarkedContent(cosName, propertyList);
+    }
+
+    public void endMarkedContent() throws IOException {
+        pageContentStream.endMarkedContent();
     }
 
     private PDFont currentFont;

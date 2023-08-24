@@ -6,6 +6,7 @@ package be.quodlibet.boxable;
 
 import java.awt.Color;
 import java.io.IOException;
+import java.net.URL;
 
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.font.PDFont;
@@ -20,6 +21,9 @@ public class Cell<T extends PDPage> {
 	private float width;
 	private Float height;
 	private String text;
+
+	private URL url = null;
+	private boolean drawURLLine = false;
 
 	private PDFont font = PDType1Font.HELVETICA;
 	private PDFont fontBold = PDType1Font.HELVETICA_BOLD;
@@ -353,7 +357,7 @@ public class Cell<T extends PDPage> {
 	 * <li>Normal value - cell's height is equal to {@link Paragraph}'s height
 	 * with necessery paddings (top,bottom)</li>
 	 * </ol>
-	 * 
+	 *
 	 * @return Cell's height
 	 * @throws IllegalStateException
 	 *             if <code>font</code> is not set.
@@ -623,7 +627,7 @@ public class Cell<T extends PDPage> {
 	/**
 	 * <p>
 	 * Easy setting for cell border style.
-	 * 
+	 *
 	 * @param border
 	 *            It is {@link LineStyle} for all borders
 	 * @see LineStyle Rendering line attributes
@@ -744,4 +748,19 @@ public class Cell<T extends PDPage> {
 		this.lineSpacing = lineSpacing;
 	}
 
+	public URL getUrl() {
+		return url;
+	}
+
+	public void setUrl(URL url) {
+		this.url = url;
+	}
+
+	public boolean getDrawUrlLine() {
+		return drawURLLine;
+	}
+
+	public void setDrawUrlLine(boolean drawURLLine) {
+		this.drawURLLine = drawURLLine;
+	}
 }
