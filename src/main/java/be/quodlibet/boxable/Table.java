@@ -33,10 +33,14 @@ import org.apache.pdfbox.pdmodel.documentinterchange.markedcontent.PDPropertyLis
 import org.apache.pdfbox.pdmodel.documentinterchange.taggedpdf.StandardStructureTypes;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.interactive.action.PDAction;
+import org.apache.pdfbox.pdmodel.interactive.action.PDActionGoTo;
 import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageDestination;
+import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageFitDestination;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageXYZDestination;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 
@@ -409,7 +413,7 @@ public abstract class Table<T extends PDPage> {
                 }
 
                 boolean hasAltText = imageCell.getAlternateText() != null && !imageCell.getAlternateText().isEmpty();
-                System.out.println("Has Alt test: " + hasAltText);
+
                 COSDictionary dictionary = new COSDictionary();
                 dictionary.setInt(COSName.MCID, 123);
 
@@ -734,6 +738,7 @@ public abstract class Table<T extends PDPage> {
                                     try {
                                         this.tableContentStream.newLineAt(cursorX, cursorY);
                                         this.tableContentStream.showText(token.getData());
+
                                         cursorX += token.getWidth(currentFont) / 1000 * cell.getFontSize();
                                     } catch (IOException e) {
                                         e.printStackTrace();
@@ -747,6 +752,59 @@ public abstract class Table<T extends PDPage> {
                     } else {
                         cursorY = cursorY - cell.getParagraph().getFontHeight() * cell.getLineSpacing();
                     }
+
+                    PDAction action = null;
+
+                    if (cell.getLocalPage() > 0) {
+                        try {
+                            PDPage destPage = document.getPage(cell.getLocalPage());
+
+                            PDPageDestination pageDestination = new PDPageFitDestination();
+                            pageDestination.setPage(destPage);
+
+                            action = new PDActionGoTo();
+                            ((PDActionGoTo) action).setDestination(pageDestination);
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    } else if (cell.getUrl() != null) {
+                        action = new PDActionURI();
+                        ((PDActionURI) action).setURI(cell.getUrl().toString());
+                    }
+
+                    if (action != null) {
+                        List<PDAnnotation> annotations = ((PDPage)currentPage).getAnnotations();
+
+                        PDBorderStyleDictionary borderULine = new PDBorderStyleDictionary();
+                        borderULine.setStyle(PDBorderStyleDictionary.STYLE_UNDERLINE);
+
+                        PDAnnotationLink txtLink = new PDAnnotationLink();
+                        if (cell.getDrawUrlLine()) {
+                            borderULine.setWidth(1); // 1 point
+                            txtLink.setBorderStyle(borderULine);
+                        } else {
+                            borderULine.setWidth(0);
+                            txtLink.setBorderStyle(borderULine);
+                            txtLink.setBorder(new COSArray());
+                        }
+
+                        // Set the rectangle containing the link
+                        // PDRectangle sets a the x,y and the width and height extend upwards from that!
+                        PDRectangle position = new PDRectangle(lineStartX, lineStartY, cell.getWidth(), -cell.getCellHeight());
+                        txtLink.setRectangle(position);
+
+                        txtLink.setAction(action);
+                        annotations.add(txtLink);
+
+                        PDObjectReference pd = new PDObjectReference();
+                        pd.setReferencedObject(txtLink);
+                        PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
+                        PDStructureElement structureElement = new PDStructureElement(StandardStructureTypes.P, treeRoot);
+                        structureElement.appendKid(pd);
+                        treeRoot.appendKid(structureElement);
+                    }
+
                 }
             }
             // set cursor to the start of this cell plus its width to advance to

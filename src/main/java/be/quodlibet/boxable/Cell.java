@@ -22,6 +22,7 @@ public class Cell<T extends PDPage> {
 	private Float height;
 	private String text;
 
+	private int localPage;
 	private URL url = null;
 	private boolean drawURLLine = false;
 
@@ -762,5 +763,13 @@ public class Cell<T extends PDPage> {
 
 	public void setDrawUrlLine(boolean drawURLLine) {
 		this.drawURLLine = drawURLLine;
+	}
+
+	public int getLocalPage() {
+		return localPage;
+	}
+
+	public void setLocalPage(int localPage) {
+		this.localPage = localPage;
 	}
 }
