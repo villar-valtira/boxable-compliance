@@ -2,7 +2,7 @@
 /*
  Quodlibet.be
  */
-package be.quodlibet.boxable;
+    package be.quodlibet.boxable;
 
 import be.quodlibet.boxable.line.LineStyle;
 import be.quodlibet.boxable.page.PageProvider;
@@ -13,18 +13,18 @@ import be.quodlibet.boxable.utils.PDStreamUtils;
 import be.quodlibet.boxable.utils.PageContentStreamOptimized;
 import java.awt.Color;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSInteger;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDNumberTreeNode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDMarkedContentReference;
 import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDObjectReference;
 import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureElement;
 import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDStructureTreeRoot;
@@ -33,6 +33,7 @@ import org.apache.pdfbox.pdmodel.documentinterchange.markedcontent.PDPropertyLis
 import org.apache.pdfbox.pdmodel.documentinterchange.taggedpdf.StandardStructureTypes;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
 import org.apache.pdfbox.pdmodel.interactive.action.PDAction;
 import org.apache.pdfbox.pdmodel.interactive.action.PDActionGoTo;
 import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
@@ -43,6 +44,7 @@ import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPa
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageFitDestination;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageXYZDestination;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
+import org.apache.pdfbox.text.TextPosition;
 
 public abstract class Table<T extends PDPage> {
 
@@ -75,6 +77,13 @@ public abstract class Table<T extends PDPage> {
     private final float pageBottomMargin;
 
     private boolean drawDebug;
+
+    private static class LinkAnnotationElements {
+        final List<PDAnnotation> _annotationItems = new ArrayList<>();
+        final List<PDStructureElement> _structureElements = new ArrayList<>();
+    }
+
+    private final LinkAnnotationElements linkAnnotationElements = new LinkAnnotationElements();
 
     /**
      * @deprecated Use one of the constructors that pass a {@link PageProvider}
@@ -251,6 +260,9 @@ public abstract class Table<T extends PDPage> {
         }
 
         endTable();
+
+        finishNumberTree();
+
         return yStart;
     }
 
@@ -417,29 +429,28 @@ public abstract class Table<T extends PDPage> {
                 COSDictionary dictionary = new COSDictionary();
                 dictionary.setInt(COSName.MCID, 123);
 
+//                tableContentStream.beginMarkedContent(COSName.IMAGE, PDPropertyList.create(dictionary));
+
+                PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
+                PDStructureElement figureStructElem = new PDStructureElement(StandardStructureTypes.Figure, treeRoot);
+                figureStructElem.setPage(currentPage);
+
+
                 if (hasAltText) {
-                    tableContentStream.beginMarkedContent(COSName.IMAGE, PDPropertyList.create(dictionary));
-
-                    PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
-                    PDStructureElement structureElement = new PDStructureElement(StandardStructureTypes.Figure, treeRoot);
-                    structureElement.setPage(currentPage);
-
-                    structureElement.setAlternateDescription(imageCell.getAlternateText());
+                    figureStructElem.setAlternateDescription(imageCell.getAlternateText());
 
                     // Set alt text on marked content for structure.
                     // This is the dictionary with the mcid used in beginMarkedContent.
                     dictionary.setString(COSName.ALT, imageCell.getAlternateText());
-
-                    PDMarkedContent markedImg = new PDMarkedContent(COSName.IMAGE, dictionary);
-                    markedImg.addXObject(imageCell.getImage().getImageXObject());
-                    structureElement.appendKid(markedImg);
                 }
+
+                PDMarkedContent markedImg = new PDMarkedContent(COSName.IMAGE, dictionary);
+                markedImg.addXObject(imageCell.getImage().getImageXObject());
+                figureStructElem.appendKid(markedImg);
 
                 imageCell.getImage().draw(document, tableContentStream, cursorX, cursorY);
 
-                if (hasAltText) {
-                    tableContentStream.endMarkedContent();
-                }
+//                tableContentStream.endMarkedContent();
 
                 if (imageCell.getUrl() != null) {
                     List<PDAnnotation> annotations = ((PDPage)currentPage).getAnnotations();
@@ -470,10 +481,13 @@ public abstract class Table<T extends PDPage> {
 
                     PDObjectReference pd = new PDObjectReference();
                     pd.setReferencedObject(txtLink);
-                    PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
-                    PDStructureElement structureElement = new PDStructureElement(StandardStructureTypes.P, treeRoot);
-                    structureElement.appendKid(pd);
-                    treeRoot.appendKid(structureElement);
+                    PDStructureElement linkStructureElement = new PDStructureElement(StandardStructureTypes.LINK, figureStructElem);
+                    linkStructureElement.appendKid(pd);
+                    linkStructureElement.appendKid(markedImg);
+
+//                    figureStructElem.appendKid(linkStructureElement);
+
+//                    treeRoot.appendKid(figureStructElem);
                 }
 
 
@@ -505,6 +519,8 @@ public abstract class Table<T extends PDPage> {
                 if (cell.getFont() == null) {
                     throw new IllegalArgumentException("Font is null on Cell=" + cell.getText());
                 }
+
+                float initialX = cursorX;
 
                 if (cell.isTextRotated()) {
                     // debugging mode - drawing (default!) padding of rotated
@@ -672,6 +688,16 @@ public abstract class Table<T extends PDPage> {
                         }
                     }
 
+                    COSDictionary dictionary = new COSDictionary();
+                    dictionary.setInt(COSName.MCID, 321);
+
+                    tableContentStream.beginMarkedContent(COSName.P, PDPropertyList.create(dictionary));
+
+                    PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
+                    PDStructureElement textStructureElement = new PDStructureElement(StandardStructureTypes.P, treeRoot);
+                    textStructureElement.setPage(currentPage);
+                    textStructureElement.setElementIdentifier(UUID.randomUUID().toString());
+
                     // iterate through tokens in current line
                     PDFont currentFont = cell.getParagraph().getFont(false, false);
                     for (Token token : entry.getValue()) {
@@ -747,6 +773,11 @@ public abstract class Table<T extends PDPage> {
                                 break;
                         }
                     }
+
+                    treeRoot.appendKid(textStructureElement);
+
+                    tableContentStream.endMarkedContent();
+
                     if (cell.isTextRotated()) {
                         cursorX = cursorX + cell.getParagraph().getFontHeight() * cell.getLineSpacing();
                     } else {
@@ -774,12 +805,11 @@ public abstract class Table<T extends PDPage> {
                     }
 
                     if (action != null) {
-                        List<PDAnnotation> annotations = ((PDPage)currentPage).getAnnotations();
-
                         PDBorderStyleDictionary borderULine = new PDBorderStyleDictionary();
                         borderULine.setStyle(PDBorderStyleDictionary.STYLE_UNDERLINE);
 
                         PDAnnotationLink txtLink = new PDAnnotationLink();
+                        txtLink.setPage(currentPage);
                         if (cell.getDrawUrlLine()) {
                             borderULine.setWidth(1); // 1 point
                             txtLink.setBorderStyle(borderULine);
@@ -789,22 +819,48 @@ public abstract class Table<T extends PDPage> {
                             txtLink.setBorder(new COSArray());
                         }
 
+
                         // Set the rectangle containing the link
                         // PDRectangle sets a the x,y and the width and height extend upwards from that!
-                        PDRectangle position = new PDRectangle(lineStartX, lineStartY, cell.getWidth(), -cell.getCellHeight());
+
+                        // initialX is set at beginning to get cell x position before calculations
+                        PDRectangle position = new PDRectangle(initialX, yStart, cell.getWidth(), -cell.getCellHeight());
                         txtLink.setRectangle(position);
-
                         txtLink.setAction(action);
-                        annotations.add(txtLink);
 
-                        PDObjectReference pd = new PDObjectReference();
-                        pd.setReferencedObject(txtLink);
-                        PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
-                        PDStructureElement structureElement = new PDStructureElement(StandardStructureTypes.P, treeRoot);
-                        structureElement.appendKid(pd);
-                        treeRoot.appendKid(structureElement);
+                        PDMarkedContent markedContent = PDMarkedContent.create(COSName.P, dictionary);
+
+                        PDMarkedContent annotMarkedContent = PDMarkedContent.create(COSName.ANNOT, dictionary);
+                        annotMarkedContent.addMarkedContent(markedContent);
+
+
+                        // make LINK tag
+                        PDStructureElement linkStructureElement = new PDStructureElement(StandardStructureTypes.LINK, treeRoot);
+                        linkStructureElement.setPage(currentPage);
+//                        linkStructureElement.setTitle("Link Tag");
+
+                        linkStructureElement.setElementIdentifier(UUID.randomUUID().toString());
+                        linkStructureElement.appendKid(annotMarkedContent);
+
+
+                        currentPage.getAnnotations().add(txtLink);
+
+                        PDObjectReference linkObjectReference = new PDObjectReference();
+                        linkObjectReference.setReferencedObject(txtLink);
+
+                        textStructureElement.appendKid(annotMarkedContent);
+                        textStructureElement.appendKid(markedContent);
+
+
+                        linkStructureElement.appendKid(linkObjectReference);
+                        textStructureElement.appendKid(linkStructureElement);
+
+                        linkAnnotationElements._structureElements.add(linkStructureElement);
+                        linkAnnotationElements._annotationItems.add(txtLink);
                     }
 
+                    treeRoot.appendKid(textStructureElement);
+//                    document.getDocumentCatalog().setStructureTreeRoot(treeRoot);
                 }
             }
             // set cursor to the start of this cell plus its width to advance to
@@ -930,6 +986,54 @@ public abstract class Table<T extends PDPage> {
             bookmarks = new ArrayList<>();
         }
         bookmarks.add(bookmark);
+    }
+
+    private void finishNumberTree() {
+        COSArray numTree = new COSArray();
+        int i = document.getDocumentCatalog().getStructureTreeRoot().getParentTreeNextKey();
+        int count = linkAnnotationElements._annotationItems.size();
+        if (count == 0) return;
+
+        for (int j = 0; j < count; j++) {
+            PDStructureElement structureElement = linkAnnotationElements._structureElements.get(j);
+            PDAnnotation annotation = linkAnnotationElements._annotationItems.get(j);
+
+            COSArray mcidParentReferences = new COSArray();
+            mcidParentReferences.add(structureElement);
+
+            numTree.add(COSInteger.get(i));
+            numTree.add(mcidParentReferences);
+
+            currentPage.getCOSObject().setItem(COSName.STRUCT_PARENTS, COSInteger.get(i));
+            currentPage.getCOSObject().setItem(COSName.getPDFName("Tabs"), COSName.S);
+            i++;
+
+            numTree.add(COSInteger.get(i));
+            numTree.add(structureElement);
+            annotation.setStructParent(i);
+            i++;
+        }
+
+        COSDictionary dict = new COSDictionary();
+        dict.setItem(COSName.NUMS, numTree);
+
+
+        // TODO: figure it out how to add without breaking current structure
+        PDNumberTreeNode parentTree = document.getDocumentCatalog().getStructureTreeRoot().getParentTree();
+        PDNumberTreeNode numberTreeNode = new PDNumberTreeNode(dict, dict.getClass());
+
+        List<PDNumberTreeNode> kids = parentTree.getKids();
+        if (kids == null) {
+            document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
+        } else {
+            parentTree.getKids().add(numberTreeNode);
+        }
+
+        // Can't override ParentTree because we loose all other tags and connections
+//        document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
+
+        // This is fine
+        document.getDocumentCatalog().getStructureTreeRoot().setParentTreeNextKey(i);
     }
 
     public List<PDOutlineItem> getBookmarks() {
