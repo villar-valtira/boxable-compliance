@@ -990,6 +990,13 @@ public abstract class Table<T extends PDPage> {
 
     private void finishNumberTree() {
         COSArray numTree = new COSArray();
+
+        PDNumberTreeNode currentParentTree = document.getDocumentCatalog().getStructureTreeRoot().getParentTree();
+
+        if (currentParentTree != null && currentParentTree.getKids() != null) {
+            currentParentTree.getKids().forEach(numTree::add);
+        }
+
         int i = document.getDocumentCatalog().getStructureTreeRoot().getParentTreeNextKey();
         int count = linkAnnotationElements._annotationItems.size();
         if (count == 0) return;
@@ -1017,20 +1024,9 @@ public abstract class Table<T extends PDPage> {
         COSDictionary dict = new COSDictionary();
         dict.setItem(COSName.NUMS, numTree);
 
-
         // TODO: figure it out how to add without breaking current structure
-        PDNumberTreeNode parentTree = document.getDocumentCatalog().getStructureTreeRoot().getParentTree();
         PDNumberTreeNode numberTreeNode = new PDNumberTreeNode(dict, dict.getClass());
-
-        List<PDNumberTreeNode> kids = parentTree.getKids();
-        if (kids == null) {
-            document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
-        } else {
-            parentTree.getKids().add(numberTreeNode);
-        }
-
-        // Can't override ParentTree because we loose all other tags and connections
-//        document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
+        document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
 
         // This is fine
         document.getDocumentCatalog().getStructureTreeRoot().setParentTreeNextKey(i);
