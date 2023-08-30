@@ -22,6 +22,7 @@ import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.COSObjectable;
 import org.apache.pdfbox.pdmodel.common.PDNumberTreeNode;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.documentinterchange.logicalstructure.PDMarkedContentReference;
@@ -988,17 +989,16 @@ public abstract class Table<T extends PDPage> {
         bookmarks.add(bookmark);
     }
 
-    private void finishNumberTree() {
+    private void finishNumberTree() throws IOException {
         int count = linkAnnotationElements._annotationItems.size();
         if (count == 0) return;
 
-        COSArray numTree = new COSArray();
+        Map<Integer, COSObjectable> numbers = new HashMap<>();
 
         PDNumberTreeNode currentParentTree = document.getDocumentCatalog().getStructureTreeRoot().getParentTree();
 
         if (currentParentTree != null) {
-            COSArray arr = currentParentTree.getCOSObject().getCOSArray(COSName.NUMS);
-            numTree.addAll(arr);
+            numbers.putAll(currentParentTree.getNumbers());
         }
 
         int i = document.getDocumentCatalog().getStructureTreeRoot().getParentTreeNextKey();
@@ -1011,24 +1011,25 @@ public abstract class Table<T extends PDPage> {
             COSArray mcidParentReferences = new COSArray();
             mcidParentReferences.add(structureElement);
 
-            numTree.add(COSInteger.get(i));
-            numTree.add(mcidParentReferences);
+            numbers.put(i, mcidParentReferences);
 
             currentPage.getCOSObject().setItem(COSName.STRUCT_PARENTS, COSInteger.get(i));
             currentPage.getCOSObject().setItem(COSName.getPDFName("Tabs"), COSName.S);
             i++;
 
-            numTree.add(COSInteger.get(i));
-            numTree.add(structureElement);
+            numbers.put(i, structureElement);
             annotation.setStructParent(i);
             i++;
         }
 
-        COSDictionary dict = new COSDictionary();
-        dict.setItem(COSName.NUMS, numTree);
+        if (currentParentTree == null) {
+            COSDictionary dict = new COSDictionary();
+            currentParentTree = new PDNumberTreeNode(dict, dict.getClass());
+            document.getDocumentCatalog().getStructureTreeRoot().setParentTree(currentParentTree);
+        }
 
-        PDNumberTreeNode numberTreeNode = new PDNumberTreeNode(dict, dict.getClass());
-        document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
+        // Set the number tree now
+        currentParentTree.setNumbers(numbers);
 
         // This is fine
         document.getDocumentCatalog().getStructureTreeRoot().setParentTreeNextKey(i);
