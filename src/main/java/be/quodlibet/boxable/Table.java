@@ -989,17 +989,20 @@ public abstract class Table<T extends PDPage> {
     }
 
     private void finishNumberTree() {
+        int count = linkAnnotationElements._annotationItems.size();
+        if (count == 0) return;
+
         COSArray numTree = new COSArray();
 
         PDNumberTreeNode currentParentTree = document.getDocumentCatalog().getStructureTreeRoot().getParentTree();
 
-        if (currentParentTree != null && currentParentTree.getKids() != null) {
-            currentParentTree.getKids().forEach(numTree::add);
+        if (currentParentTree != null) {
+            COSArray arr = currentParentTree.getCOSObject().getCOSArray(COSName.NUMS);
+            numTree.addAll(arr);
         }
 
         int i = document.getDocumentCatalog().getStructureTreeRoot().getParentTreeNextKey();
-        int count = linkAnnotationElements._annotationItems.size();
-        if (count == 0) return;
+
 
         for (int j = 0; j < count; j++) {
             PDStructureElement structureElement = linkAnnotationElements._structureElements.get(j);
@@ -1024,7 +1027,6 @@ public abstract class Table<T extends PDPage> {
         COSDictionary dict = new COSDictionary();
         dict.setItem(COSName.NUMS, numTree);
 
-        // TODO: figure it out how to add without breaking current structure
         PDNumberTreeNode numberTreeNode = new PDNumberTreeNode(dict, dict.getClass());
         document.getDocumentCatalog().getStructureTreeRoot().setParentTree(numberTreeNode);
 
