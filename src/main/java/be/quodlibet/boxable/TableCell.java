@@ -36,20 +36,17 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	private float height = 0;
 	private final PDDocument doc;
 	private final PDPage page;
-	private float marginBetweenElementsY = FontUtils.getHeight(getFont(), getFontSize());
+	private final float marginBetweenElementsY = FontUtils.getHeight(getFont(), getFontSize());
 	private final HorizontalAlignment align;
 	private final VerticalAlignment valign;
 
-	// default FreeSans font
-//	private PDFont font = FontUtils.getDefaultfonts().get("font");
-//	private PDFont fontBold = FontUtils.getDefaultfonts().get("fontBold");
 	private PageContentStreamOptimized tableCellContentStream;
 
 	// page margins
 	private final float pageTopMargin;
 	private final float pageBottomMargin;
 	// default title fonts
-	private int tableTitleFontSize = 8;
+	private final int tableTitleFontSize = 8;
 
 	TableCell(Row<T> row, float width, String tableData, boolean isCalculated, PDDocument document, PDPage page,
 			  float yStart, float pageTopMargin, float pageBottomMargin) {
@@ -86,7 +83,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	<th>})
 	 * </p>
 	 */
-	@SuppressWarnings({ "unused", "unchecked" })
+	@SuppressWarnings({ "unused"})
 	public void fillTable() {
 		try {
 			// please consider the cell's paddings
@@ -94,12 +91,12 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 			tableCellContentStream = new PageContentStreamOptimized(new PDPageContentStream(doc, page, true, true));
 			// check if there is some additional text outside inner table
 			String[] outerTableText = tableData.split("<table");
-			// don't forget to attach splited tag
+			// don't forget to attach split tag
 			for (int i = 1; i < outerTableText.length; i++) {
 				outerTableText[i] = "<table " + outerTableText[i];
 			}
-			Paragraph outerTextParagraph = null;
-			String caption = "";
+			Paragraph outerTextParagraph;
+			String caption;
 			height = 0;
 			height = (getTopBorder() == null ? 0 : getTopBorder().getWidth()) + getTopPadding();
 			for (String element : outerTableText) {
@@ -123,8 +120,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 							// make paragraph and get tokens
 							outerTextParagraph = new Paragraph(chunkie, getFont(), 8, (int) tableWidth);
 							outerTextParagraph.getLines();
-							height += (outerTextParagraph != null
-									? outerTextParagraph.getHeight() + marginBetweenElementsY : 0);
+							height += outerTextParagraph.getHeight() + marginBetweenElementsY;
 							yStart = writeOrCalculateParagraph(outerTextParagraph, true);
 						}
 					}
@@ -132,14 +128,13 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 					// make paragraph and get tokens
 					outerTextParagraph = new Paragraph(element, getFont(), 8, (int) tableWidth);
 					outerTextParagraph.getLines();
-					height += (outerTextParagraph != null ? outerTextParagraph.getHeight() + marginBetweenElementsY
-							: 0);
+					height += outerTextParagraph.getHeight() + marginBetweenElementsY;
 					yStart = writeOrCalculateParagraph(outerTextParagraph, true);
 				}
 			}
 			tableCellContentStream.close();
 		} catch (IOException e) {
-			logger.warn("Cannot create table in TableCell. Table data: '{}' " + tableData + e);
+			logger.warn("Cannot create table in TableCell. Table data: '{}'", tableData + e);
 		}
 	}
 
@@ -150,13 +145,14 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 		document.outputSettings().prettyPrint(false);
 		Element htmlTable = document.select("table").first();
 
-		Elements rows = htmlTable.select("tr");
+        assert htmlTable != null;
+        Elements rows = htmlTable.select("tr");
 		for (Element htmlTableRow : rows) {
 			Row<PDPage> row = table.createRow(0);
 			Elements tableCols = htmlTableRow.select("td");
 			Elements tableHeaderCols = htmlTableRow.select("th");
 			// do we have header columns?
-			boolean tableHasHeaderColumns = tableHeaderCols.isEmpty() ? false : true;
+			boolean tableHasHeaderColumns = !tableHeaderCols.isEmpty();
 			if (tableHasHeaderColumns) {
 				// if entire row is not header row then use bold instead
 				// header cell (<th>)
@@ -166,26 +162,28 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 			// calculate how much really columns do you have (including
 			// colspans!)
 			for (Element col : tableHasHeaderColumns ? tableHeaderCols : tableCols) {
-				if (col.attr("colspan") != null && !col.attr("colspan").isEmpty()) {
+                col.attr("colspan");
+                if (!col.attr("colspan").isEmpty()) {
 					columnsSize += Integer.parseInt(col.attr("colspan")) - 1;
 				}
 			}
 			for (Element col : tableHasHeaderColumns ? tableHeaderCols : tableCols) {
-				if (col.attr("colspan") != null && !col.attr("colspan").isEmpty()) {
-					Cell<T> cell = (Cell<T>) row.createCell(
+                col.attr("colspan");
+                if (!col.attr("colspan").isEmpty()) {
+					row.createCell(
 							tableWidth / columnsSize * Integer.parseInt(col.attr("colspan")) / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
-				} else if (col.attr("img") != null){
+				} else if (col.hasAttr("img")){
 					File imageFile = new File(col.attr("src"));
 					Image image = new Image(ImageIO.read(imageFile));
 					String widthScale = col.attr("width");
-					if(widthScale != null && !col.attr("width").isEmpty()) {
+					if(!col.attr("width").isEmpty()) {
 						image = image.scaleByWidth(Float.parseFloat(col.attr("width")));
 					}
-					Cell<T> cell = (Cell<T>) row.createImageCell(Float.parseFloat(widthScale), image);
+					row.createImageCell(Float.parseFloat(widthScale), image);
 				}
 				else {
-					Cell<T> cell = (Cell<T>) row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
+					row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
 				}
 			}
@@ -277,7 +275,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 					case PADDING:
 						cursorX += Float.parseFloat(token.getData());
 						break;
-					case ORDERING:
+					case ORDERING, TEXT:
 						currentFont = paragraph.getFont(boldCounter > 0, italicCounter > 0);
 						tableCellContentStream.setFont(currentFont, getFontSize());
 						if (isTextRotated()) {
@@ -319,24 +317,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 							cursorX += 2 * widthOfSpace / 1000 * getFontSize();
 						}
 						break;
-					case TEXT:
-						currentFont = paragraph.getFont(boldCounter > 0, italicCounter > 0);
-						tableCellContentStream.setFont(currentFont, getFontSize());
-						if (isTextRotated()) {
-							if (!onlyCalculateHeight) {
-								tableCellContentStream.newLineAt(cursorX, cursorY);
-								tableCellContentStream.showText(token.getData());
-							}
-							cursorY += token.getWidth(currentFont) / 1000 * getFontSize();
-						} else {
-							if (!onlyCalculateHeight) {
-								tableCellContentStream.newLineAt(cursorX, cursorY);
-								tableCellContentStream.showText(token.getData());
-							}
-							cursorX += token.getWidth(currentFont) / 1000 * getFontSize();
-						}
-						break;
-				}
+                }
 			}
 			// reset
 			cursorX = xStart;
@@ -361,7 +342,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	 *            {@link PDPage} where table cell be written on
 	 *
 	 */
-	@SuppressWarnings({ "unused", "unchecked" })
+	@SuppressWarnings({ "unused"})
 	public void draw(PDPage page) {
 		try {
 			// please consider the cell's paddings
@@ -373,8 +354,8 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 			for (int i = 1; i < outerTableText.length; i++) {
 				outerTableText[i] = "<table " + outerTableText[i];
 			}
-			Paragraph outerTextParagraph = null;
-			String caption = "";
+			Paragraph outerTextParagraph;
+			String caption;
 			height = 0;
 			height = (getTopBorder() == null ? 0 : getTopBorder().getWidth()) + getTopPadding();
 			for (String element : outerTableText) {
@@ -399,8 +380,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 							// make paragraph and get tokens
 							outerTextParagraph = new Paragraph(chunkie, getFont(), 8, (int) tableWidth);
 							outerTextParagraph.getLines();
-							height += (outerTextParagraph != null
-									? outerTextParagraph.getHeight() + marginBetweenElementsY : 0);
+							height += outerTextParagraph.getHeight() + marginBetweenElementsY;
 							yStart = writeOrCalculateParagraph(outerTextParagraph, false);
 						}
 					}
@@ -408,14 +388,13 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 					// make paragraph and get tokens
 					outerTextParagraph = new Paragraph(element, getFont(), 8, (int) tableWidth);
 					outerTextParagraph.getLines();
-					height += (outerTextParagraph != null ? outerTextParagraph.getHeight() + marginBetweenElementsY
-							: 0);
+					height += outerTextParagraph.getHeight() + marginBetweenElementsY;
 					yStart = writeOrCalculateParagraph(outerTextParagraph, false);
 				}
 			}
 			tableCellContentStream.close();
 		} catch (IOException e) {
-			logger.warn("Cannot draw table for TableCell! Table data: '{}'" + tableData + e);
+			logger.warn("Cannot draw table for TableCell! Table data: '{}'", tableData + e);
 		}
 	}
 
@@ -448,6 +427,43 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	@Override
 	public float getVerticalFreeSpace() {
 		return getInnerHeight() - width;
+	}
+
+	public static void main(String[] args) {
+		try {
+			PDDocument doc = new PDDocument();
+			PDPage page = new PDPage();
+			doc.addPage(page);
+
+			float margin = 34;
+
+			float yStartNewPage = page.getMediaBox().getHeight() - (2 * margin);
+			float tableWidth = 540;
+
+			boolean drawContent = true;
+			float yStart = yStartNewPage;
+			float bottomMargin = 0;
+			float yPosition = 284;
+
+			BaseTable table = new BaseTable(yPosition, yStartNewPage,
+					bottomMargin, tableWidth, margin, doc, page, true, drawContent);
+
+			String table1 = "<table><tr><td><img src=\"https://mos-asset-upload-stage.s3.amazonaws.com/icons/award_brand_blue.png\" alt=\"award_brand_blue\" width=\"30\" height=\"30\" /></td><td>First row, second value</td></tr></table>";
+
+			Row<PDPage> row = table.createRow(10);
+			row.createTableCell(80, table1, doc, page, yStart, 10, 1);
+
+//			Row<PDPage> row = table.createRow(10);
+//			TableCell<PDPage> cell = (TableCell<PDPage>) row.createCell(100, "Data 1");
+//			cell = (TableCell<PDPage>) row.createCell(100, "Data 2");
+//			cell = (TableCell<PDPage>) row.createCell(100, "Data 3");
+//			cell = (TableCell<PDPage>) row.createCell(100, "Data 4");
+			table.draw();
+			doc.save("/tmp/text.pdf");
+			doc.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 }
