@@ -145,8 +145,8 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 		document.outputSettings().prettyPrint(false);
 		Element htmlTable = document.select("table").first();
 
-        assert htmlTable != null;
-        Elements rows = htmlTable.select("tr");
+		assert htmlTable != null;
+		Elements rows = htmlTable.select("tr");
 		for (Element htmlTableRow : rows) {
 			Row<PDPage> row = table.createRow(0);
 			Elements tableCols = htmlTableRow.select("td");
@@ -162,25 +162,33 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 			// calculate how much really columns do you have (including
 			// colspans!)
 			for (Element col : tableHasHeaderColumns ? tableHeaderCols : tableCols) {
-                col.attr("colspan");
-                if (!col.attr("colspan").isEmpty()) {
+				col.attr("colspan");
+				if (!col.attr("colspan").isEmpty()) {
 					columnsSize += Integer.parseInt(col.attr("colspan")) - 1;
 				}
 			}
 			for (Element col : tableHasHeaderColumns ? tableHeaderCols : tableCols) {
-                col.attr("colspan");
-                if (!col.attr("colspan").isEmpty()) {
+
+				boolean hasChildren = !col.children().isEmpty();
+				boolean isChildrenImage = hasChildren && col.children().first().hasAttr("img");
+
+				if(isChildrenImage) {
+					float widthScale = 30f;
+					if(!col.attr("colspan").isEmpty()) {
+						widthScale = tableWidth / columnsSize * Integer.parseInt(col.attr("colspan"));
+					}
+					File imageFile = new File(col.attr("src"));
+					Image image = new Image(ImageIO.read(imageFile));
+					if(col.hasAttr("width")) {
+						widthScale = Float.parseFloat(col.attr("width"));
+					}
+					image = image.scaleByWidth(widthScale);
+					row.createImageCell(widthScale, image);
+				}
+				else if (!col.attr("colspan").isEmpty()) {
 					row.createCell(
 							tableWidth / columnsSize * Integer.parseInt(col.attr("colspan")) / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
-				} else if (col.hasAttr("img")){
-					File imageFile = new File(col.attr("src"));
-					Image image = new Image(ImageIO.read(imageFile));
-					String widthScale = col.attr("width");
-					if(!col.attr("width").isEmpty()) {
-						image = image.scaleByWidth(Float.parseFloat(col.attr("width")));
-					}
-					row.createImageCell(Float.parseFloat(widthScale), image);
 				}
 				else {
 					row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
@@ -317,7 +325,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 							cursorX += 2 * widthOfSpace / 1000 * getFontSize();
 						}
 						break;
-                }
+				}
 			}
 			// reset
 			cursorX = xStart;
@@ -459,7 +467,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 //			cell = (TableCell<PDPage>) row.createCell(100, "Data 3");
 //			cell = (TableCell<PDPage>) row.createCell(100, "Data 4");
 			table.draw();
-			doc.save("/tmp/text.pdf");
+			doc.save("/tmp/test.pdf");
 			doc.close();
 		} catch (IOException e) {
 			e.printStackTrace();
