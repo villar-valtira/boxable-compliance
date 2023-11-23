@@ -1,9 +1,11 @@
 package be.quodlibet.boxable;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import be.quodlibet.boxable.image.Image;
 import be.quodlibet.boxable.utils.PageContentStreamOptimized;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -20,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import be.quodlibet.boxable.text.Token;
 import be.quodlibet.boxable.utils.FontUtils;
 import be.quodlibet.boxable.utils.PDStreamUtils;
+
+import javax.imageio.ImageIO;
 
 public class TableCell<T extends PDPage> extends Cell<T> {
 
@@ -48,14 +52,14 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	private int tableTitleFontSize = 8;
 
 	TableCell(Row<T> row, float width, String tableData, boolean isCalculated, PDDocument document, PDPage page,
-			float yStart, float pageTopMargin, float pageBottomMargin) {
+			  float yStart, float pageTopMargin, float pageBottomMargin) {
 		this(row, width, tableData, isCalculated, document, page, yStart, pageTopMargin, pageBottomMargin,
 				HorizontalAlignment.LEFT, VerticalAlignment.TOP);
 	}
 
 	TableCell(Row<T> row, float width, String tableData, boolean isCalculated, PDDocument document, PDPage page,
-			float yStart, float pageTopMargin, float pageBottomMargin, final HorizontalAlignment align,
-			final VerticalAlignment valign) {
+			  float yStart, float pageTopMargin, float pageBottomMargin, final HorizontalAlignment align,
+			  final VerticalAlignment valign) {
 		super(row, width, tableData, isCalculated);
 		this.tableData = tableData;
 		this.width = width * row.getWidth() / 100;
@@ -78,7 +82,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	 * <p>
 	 * NOTE: if entire row is not header row then use bold instead header cell (
 	 * {@code
-	 * 
+	 *
 	<th>})
 	 * </p>
 	 */
@@ -171,7 +175,16 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 					Cell<T> cell = (Cell<T>) row.createCell(
 							tableWidth / columnsSize * Integer.parseInt(col.attr("colspan")) / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
-				} else {
+				} else if (col.attr("img") != null){
+					File imageFile = new File(col.attr("src"));
+					Image image = new Image(ImageIO.read(imageFile));
+					String widthScale = col.attr("width");
+					if(widthScale != null && !col.attr("width").isEmpty()) {
+						image = image.scaleByWidth(Float.parseFloat(col.attr("width")));
+					}
+					Cell<T> cell = (Cell<T>) row.createImageCell(Float.parseFloat(widthScale), image);
+				}
+				else {
 					Cell<T> cell = (Cell<T>) row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
 				}
@@ -189,7 +202,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	 * <p>
 	 * Method provides writing or height calculation of possible outer text
 	 * </p>
-	 * 
+	 *
 	 * @param paragraph
 	 *            Paragraph that needs to be written or whose height needs to be
 	 *            calculated
@@ -219,27 +232,27 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 			float freeSpaceWithinLine = paragraph.getMaxLineWidth() - paragraph.getLineWidth(entry.getKey());
 			if (isTextRotated()) {
 				switch (align) {
-				case CENTER:
-					cursorY += freeSpaceWithinLine / 2;
-					break;
-				case LEFT:
-					break;
-				case RIGHT:
-					cursorY += freeSpaceWithinLine;
-					break;
+					case CENTER:
+						cursorY += freeSpaceWithinLine / 2;
+						break;
+					case LEFT:
+						break;
+					case RIGHT:
+						cursorY += freeSpaceWithinLine;
+						break;
 				}
 			} else {
 				switch (align) {
-				case CENTER:
-					cursorX += freeSpaceWithinLine / 2;
-					break;
-				case LEFT:
-					// it doesn't matter because X position is always the same
-					// as row above
-					break;
-				case RIGHT:
-					cursorX += freeSpaceWithinLine;
-					break;
+					case CENTER:
+						cursorX += freeSpaceWithinLine / 2;
+						break;
+					case LEFT:
+						// it doesn't matter because X position is always the same
+						// as row above
+						break;
+					case RIGHT:
+						cursorX += freeSpaceWithinLine;
+						break;
 				}
 			}
 
@@ -247,82 +260,82 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 			PDFont currentFont = paragraph.getFont(false, false);
 			for (Token token : entry.getValue()) {
 				switch (token.getType()) {
-				case OPEN_TAG:
-					if ("b".equals(token.getData())) {
-						boldCounter++;
-					} else if ("i".equals(token.getData())) {
-						italicCounter++;
-					}
-					break;
-				case CLOSE_TAG:
-					if ("b".equals(token.getData())) {
-						boldCounter = Math.max(boldCounter - 1, 0);
-					} else if ("i".equals(token.getData())) {
-						italicCounter = Math.max(italicCounter - 1, 0);
-					}
-					break;
-				case PADDING:
-					cursorX += Float.parseFloat(token.getData());
-					break;
-				case ORDERING:
-					currentFont = paragraph.getFont(boldCounter > 0, italicCounter > 0);
-					tableCellContentStream.setFont(currentFont, getFontSize());
-					if (isTextRotated()) {
-						// if it is not calculation then draw it
-						if (!onlyCalculateHeight) {
-							tableCellContentStream.newLineAt(cursorX, cursorY);
-							tableCellContentStream.showText(token.getData());
+					case OPEN_TAG:
+						if ("b".equals(token.getData())) {
+							boldCounter++;
+						} else if ("i".equals(token.getData())) {
+							italicCounter++;
 						}
-						cursorY += token.getWidth(currentFont) / 1000 * getFontSize();
-					} else {
-						// if it is not calculation then draw it
-						if (!onlyCalculateHeight) {
-							tableCellContentStream.newLineAt(cursorX, cursorY);
-							tableCellContentStream.showText(token.getData());
+						break;
+					case CLOSE_TAG:
+						if ("b".equals(token.getData())) {
+							boldCounter = Math.max(boldCounter - 1, 0);
+						} else if ("i".equals(token.getData())) {
+							italicCounter = Math.max(italicCounter - 1, 0);
 						}
-						cursorX += token.getWidth(currentFont) / 1000 * getFontSize();
-					}
-					break;
-				case BULLET:
-					float widthOfSpace = currentFont.getSpaceWidth();
-					float halfHeight = FontUtils.getHeight(currentFont, getFontSize()) / 2;
-					if (isTextRotated()) {
-						if (!onlyCalculateHeight) {
-							PDStreamUtils.rect(tableCellContentStream, cursorX + halfHeight, cursorY,
-									token.getWidth(currentFont) / 1000 * getFontSize(),
-									widthOfSpace / 1000 * getFontSize(), getTextColor());
+						break;
+					case PADDING:
+						cursorX += Float.parseFloat(token.getData());
+						break;
+					case ORDERING:
+						currentFont = paragraph.getFont(boldCounter > 0, italicCounter > 0);
+						tableCellContentStream.setFont(currentFont, getFontSize());
+						if (isTextRotated()) {
+							// if it is not calculation then draw it
+							if (!onlyCalculateHeight) {
+								tableCellContentStream.newLineAt(cursorX, cursorY);
+								tableCellContentStream.showText(token.getData());
+							}
+							cursorY += token.getWidth(currentFont) / 1000 * getFontSize();
+						} else {
+							// if it is not calculation then draw it
+							if (!onlyCalculateHeight) {
+								tableCellContentStream.newLineAt(cursorX, cursorY);
+								tableCellContentStream.showText(token.getData());
+							}
+							cursorX += token.getWidth(currentFont) / 1000 * getFontSize();
 						}
-						// move cursorY for two characters (one for bullet, one
-						// for space after bullet)
-						cursorY += 2 * widthOfSpace / 1000 * getFontSize();
-					} else {
-						if (!onlyCalculateHeight) {
-							PDStreamUtils.rect(tableCellContentStream, cursorX, cursorY + halfHeight,
-									token.getWidth(currentFont) / 1000 * getFontSize(),
-									widthOfSpace / 1000 * getFontSize(), getTextColor());
+						break;
+					case BULLET:
+						float widthOfSpace = currentFont.getSpaceWidth();
+						float halfHeight = FontUtils.getHeight(currentFont, getFontSize()) / 2;
+						if (isTextRotated()) {
+							if (!onlyCalculateHeight) {
+								PDStreamUtils.rect(tableCellContentStream, cursorX + halfHeight, cursorY,
+										token.getWidth(currentFont) / 1000 * getFontSize(),
+										widthOfSpace / 1000 * getFontSize(), getTextColor());
+							}
+							// move cursorY for two characters (one for bullet, one
+							// for space after bullet)
+							cursorY += 2 * widthOfSpace / 1000 * getFontSize();
+						} else {
+							if (!onlyCalculateHeight) {
+								PDStreamUtils.rect(tableCellContentStream, cursorX, cursorY + halfHeight,
+										token.getWidth(currentFont) / 1000 * getFontSize(),
+										widthOfSpace / 1000 * getFontSize(), getTextColor());
+							}
+							// move cursorX for two characters (one for bullet, one
+							// for space after bullet)
+							cursorX += 2 * widthOfSpace / 1000 * getFontSize();
 						}
-						// move cursorX for two characters (one for bullet, one
-						// for space after bullet)
-						cursorX += 2 * widthOfSpace / 1000 * getFontSize();
-					}
-					break;
-				case TEXT:
-					currentFont = paragraph.getFont(boldCounter > 0, italicCounter > 0);
-					tableCellContentStream.setFont(currentFont, getFontSize());
-					if (isTextRotated()) {
-						if (!onlyCalculateHeight) {
-							tableCellContentStream.newLineAt(cursorX, cursorY);
-							tableCellContentStream.showText(token.getData());
+						break;
+					case TEXT:
+						currentFont = paragraph.getFont(boldCounter > 0, italicCounter > 0);
+						tableCellContentStream.setFont(currentFont, getFontSize());
+						if (isTextRotated()) {
+							if (!onlyCalculateHeight) {
+								tableCellContentStream.newLineAt(cursorX, cursorY);
+								tableCellContentStream.showText(token.getData());
+							}
+							cursorY += token.getWidth(currentFont) / 1000 * getFontSize();
+						} else {
+							if (!onlyCalculateHeight) {
+								tableCellContentStream.newLineAt(cursorX, cursorY);
+								tableCellContentStream.showText(token.getData());
+							}
+							cursorX += token.getWidth(currentFont) / 1000 * getFontSize();
 						}
-						cursorY += token.getWidth(currentFont) / 1000 * getFontSize();
-					} else {
-						if (!onlyCalculateHeight) {
-							tableCellContentStream.newLineAt(cursorX, cursorY);
-							tableCellContentStream.showText(token.getData());
-						}
-						cursorX += token.getWidth(currentFont) / 1000 * getFontSize();
-					}
-					break;
+						break;
 				}
 			}
 			// reset
@@ -340,13 +353,13 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 	 * <p>
 	 * NOTE: if entire row is not header row then use bold instead header cell (
 	 * {@code
-	 * 
+	 *
 	<th>})
 	 * </p>
-	 * 
+	 *
 	 * @param page
 	 *            {@link PDPage} where table cell be written on
-	 * 
+	 *
 	 */
 	@SuppressWarnings({ "unused", "unchecked" })
 	public void draw(PDPage page) {
