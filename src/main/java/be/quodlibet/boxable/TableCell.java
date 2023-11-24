@@ -469,8 +469,6 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 
 			outputStream.close();
 			inputStream.close();
-
-			System.out.println("Arquivo baixado com sucesso.");
 		} catch (Exception ex) {
 			logger.error("Error downloading file from url: {}", sourceUrl, ex);
 		}
