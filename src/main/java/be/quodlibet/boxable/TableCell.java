@@ -1,11 +1,10 @@
 package be.quodlibet.boxable;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-
 import be.quodlibet.boxable.image.Image;
+import be.quodlibet.boxable.line.LineStyle;
+import be.quodlibet.boxable.text.Token;
+import be.quodlibet.boxable.utils.FontUtils;
+import be.quodlibet.boxable.utils.PDStreamUtils;
 import be.quodlibet.boxable.utils.PageContentStreamOptimized;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -19,11 +18,13 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import be.quodlibet.boxable.text.Token;
-import be.quodlibet.boxable.utils.FontUtils;
-import be.quodlibet.boxable.utils.PDStreamUtils;
-
 import javax.imageio.ImageIO;
+import java.awt.*;
+import java.io.*;
+import java.net.URL;
+import java.net.URLConnection;
+import java.util.List;
+import java.util.Map;
 
 public class TableCell<T extends PDPage> extends Cell<T> {
 
@@ -168,31 +169,45 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 				}
 			}
 			for (Element col : tableHasHeaderColumns ? tableHeaderCols : tableCols) {
-
 				boolean hasChildren = !col.children().isEmpty();
-				boolean isChildrenImage = hasChildren && col.children().first().hasAttr("img");
+				boolean isChildrenImage = hasChildren && col.children().first().tag().getName().equals("img");
 
 				if(isChildrenImage) {
+					Element imageElement = col.children().first();
 					float widthScale = 30f;
+					float height = 30f;
 					if(!col.attr("colspan").isEmpty()) {
 						widthScale = tableWidth / columnsSize * Integer.parseInt(col.attr("colspan"));
 					}
-					File imageFile = new File(col.attr("src"));
+					File imageFile = new File(downloadFile(imageElement.attr("src"), "png"));
+					imageFile.deleteOnExit();
 					Image image = new Image(ImageIO.read(imageFile));
-					if(col.hasAttr("width")) {
-						widthScale = Float.parseFloat(col.attr("width"));
+					if(imageElement.hasAttr("width")) {
+						widthScale = Float.parseFloat(imageElement.attr("width"));
+					}
+					if(imageElement.hasAttr("height")) {
+						height = Float.parseFloat(imageElement.attr("height"));
 					}
 					image = image.scaleByWidth(widthScale);
-					row.createImageCell(widthScale, image);
+					image = image.scaleByHeight(height);
+					ImageCell<PDPage> cell = row.createImageCell(widthScale, image);
+
+                    if (imageElement.hasAttr("alt")) {
+                        cell.setAlternateText(imageElement.attr("alt"));
+                    } else {
+                        cell.setAlternateText(imageFile.getName());
+                    }
+					cell.setBorderStyle(new LineStyle(Color.WHITE, 0));
 				}
 				else if (!col.attr("colspan").isEmpty()) {
-					row.createCell(
+					Cell<PDPage> cell = row.createCell(
 							tableWidth / columnsSize * Integer.parseInt(col.attr("colspan")) / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
 				}
 				else {
-					row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
+					Cell<PDPage> cell = row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
+					cell.setBorderStyle(new LineStyle(Color.WHITE, 0));
 				}
 			}
 			yStart -= row.getHeight();
@@ -437,41 +452,29 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 		return getInnerHeight() - width;
 	}
 
-	public static void main(String[] args) {
+	private static String downloadFile(String sourceUrl, String suffix) {
+		String destinationFile = "/tmp/" + System.currentTimeMillis() + "." + suffix;
 		try {
-			PDDocument doc = new PDDocument();
-			PDPage page = new PDPage();
-			doc.addPage(page);
+			URL url = new URL(sourceUrl);
+			URLConnection connection = url.openConnection();
+			InputStream inputStream = connection.getInputStream();
 
-			float margin = 34;
+			OutputStream outputStream = new FileOutputStream(destinationFile);
 
-			float yStartNewPage = page.getMediaBox().getHeight() - (2 * margin);
-			float tableWidth = 540;
+			byte[] buffer = new byte[4096];
+			int bytesRead;
+			while ((bytesRead = inputStream.read(buffer)) != -1) {
+				outputStream.write(buffer, 0, bytesRead);
+			}
 
-			boolean drawContent = true;
-			float yStart = yStartNewPage;
-			float bottomMargin = 0;
-			float yPosition = 284;
+			outputStream.close();
+			inputStream.close();
 
-			BaseTable table = new BaseTable(yPosition, yStartNewPage,
-					bottomMargin, tableWidth, margin, doc, page, true, drawContent);
-
-			String table1 = "<table><tr><td><img src=\"https://mos-asset-upload-stage.s3.amazonaws.com/icons/award_brand_blue.png\" alt=\"award_brand_blue\" width=\"30\" height=\"30\" /></td><td>First row, second value</td></tr></table>";
-
-			Row<PDPage> row = table.createRow(10);
-			row.createTableCell(80, table1, doc, page, yStart, 10, 1);
-
-//			Row<PDPage> row = table.createRow(10);
-//			TableCell<PDPage> cell = (TableCell<PDPage>) row.createCell(100, "Data 1");
-//			cell = (TableCell<PDPage>) row.createCell(100, "Data 2");
-//			cell = (TableCell<PDPage>) row.createCell(100, "Data 3");
-//			cell = (TableCell<PDPage>) row.createCell(100, "Data 4");
-			table.draw();
-			doc.save("/tmp/test.pdf");
-			doc.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("Arquivo baixado com sucesso.");
+		} catch (Exception ex) {
+			logger.error("Error downloading file from url: {}", sourceUrl, ex);
 		}
+		return destinationFile;
 	}
 
 }
