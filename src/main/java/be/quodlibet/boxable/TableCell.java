@@ -190,14 +190,14 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 					}
 					image = image.scaleByWidth(widthScale);
 					image = image.scaleByHeight(height);
-					ImageCell<PDPage> cell = row.createImageCell(widthScale, image);
+					ImageCell<PDPage> cell = (ImageCell<PDPage>) row.createImageCell(widthScale, image, HorizontalAlignment.CENTER, VerticalAlignment.TOP);
 
                     if (imageElement.hasAttr("alt")) {
                         cell.setAlternateText(imageElement.attr("alt"));
                     } else {
                         cell.setAlternateText(imageFile.getName());
                     }
-					cell.setBorderStyle(new LineStyle(Color.WHITE, 0));
+					cell.setBorderStyle(new LineStyle(Color.BLACK, 1));
 				}
 				else if (!col.attr("colspan").isEmpty()) {
 					Cell<PDPage> cell = row.createCell(
@@ -207,7 +207,7 @@ public class TableCell<T extends PDPage> extends Cell<T> {
 				else {
 					Cell<PDPage> cell = row.createCell(tableWidth / columnsSize / row.getWidth() * 100,
 							col.html().replace("&amp;", "&"));
-					cell.setBorderStyle(new LineStyle(Color.WHITE, 0));
+					cell.setBorderStyle(new LineStyle(Color.BLACK, 1));
 				}
 			}
 			yStart -= row.getHeight();
