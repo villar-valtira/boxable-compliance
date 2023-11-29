@@ -438,6 +438,24 @@ public abstract class Table<T extends PDPage> {
                 PDStructureElement figureStructElem = new PDStructureElement(StandardStructureTypes.Figure, treeRoot);
                 figureStructElem.setPage(currentPage);
 
+                boolean hasBottomText = imageCell.getBottomText() != null && !imageCell.getBottomText().isEmpty();
+
+                if (hasBottomText) {
+
+                    try {
+                        this.tableContentStream.setFont(imageCell.getFont(), imageCell.getFontSize());
+
+                        float y = cursorY - imageCell.getImage().getHeight() - 10; // add some space from image
+                        float x = cursorX - (imageCell.getImage().getWidth() / 2.25f);
+
+                        this.tableContentStream.newLineAt(x, y);
+                        this.tableContentStream.showText(imageCell.getBottomText());
+
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
 
                 if (hasAltText) {
                     figureStructElem.setAlternateDescription(imageCell.getAlternateText());
