@@ -432,30 +432,55 @@ public abstract class Table<T extends PDPage> {
                 COSDictionary dictionary = new COSDictionary();
                 dictionary.setInt(COSName.MCID, mcid);
 
-                tableContentStream.beginMarkedContent(COSName.IMAGE, PDPropertyList.create(dictionary));
-
+                boolean hasBottomText = imageCell.getText() != null && !imageCell.getText().isEmpty();
                 PDStructureTreeRoot treeRoot = document.getDocumentCatalog().getStructureTreeRoot();
-                PDStructureElement figureStructElem = new PDStructureElement(StandardStructureTypes.Figure, treeRoot);
-                figureStructElem.setPage(currentPage);
-
-                boolean hasBottomText = imageCell.getBottomText() != null && !imageCell.getBottomText().isEmpty();
 
                 if (hasBottomText) {
+//                    imageCell.setText(imageCell.getBottomText());
+
+                    this.tableContentStream.setFont(imageCell.getFont(), imageCell.getFontSize());
+
+                    this.tableContentStream.beginMarkedContent(COSName.P, PDPropertyList.create(dictionary));
+
+                    this.tableContentStream.setNonStrokingColor(cell.getTextColor());
 
                     try {
-                        this.tableContentStream.setFont(imageCell.getFont(), imageCell.getFontSize());
+                        float lineStartY = cursorY - imageCell.getImage().getHeight() - imageCell.getTextMarginFromImage(); // add some space from image
 
-                        float y = cursorY - imageCell.getImage().getHeight() - 10; // add some space from image
-                        float x = cursorX - (imageCell.getImage().getWidth() / 2.25f);
+//                        System.out.println("Width: " + imageCell.getWidth());
+//                        System.out.println("InnerWidth: " + imageCell.getInnerWidth());
+//                        System.out.println("ExtraWidth: " + imageCell.getExtraWidth());
+//                        System.out.println("TextWidth: " + imageCell.getTextWidth());
+//                        System.out.println("CursorX: " + cursorX);
+//                        System.out.println("Image Width: " + imageCell.getImage().getWidth());
+//                        System.out.println();
 
-                        this.tableContentStream.newLineAt(x, y);
-                        this.tableContentStream.showText(imageCell.getBottomText());
+                        float lineStartX = cellStartX;
+                        lineStartX += cell.getLeftPadding() + (cell.getLeftBorder() == null ? 0 : cell.getLeftBorder().getWidth());
 
+                        if (imageCell.getTextAlign() != null) {
+                            imageCell.getParagraph().setAlign(imageCell.getTextAlign());
+                        }
 
-                    } catch (IOException e) {
+                        PDStructureElement textStructureElement = new PDStructureElement(StandardStructureTypes.P, treeRoot);
+                        textStructureElement.setPage(currentPage);
+                        textStructureElement.setElementIdentifier(UUID.randomUUID().toString());
+
+                        float aux = imageCell.getParagraph().write(this.tableContentStream, lineStartX, lineStartY);
+
+                        treeRoot.appendKid(textStructureElement);
+
+                        tableContentStream.endMarkedContent();
+                    } catch (Exception e) {
                         e.printStackTrace();
+                        throw e;
                     }
                 }
+
+                tableContentStream.beginMarkedContent(COSName.IMAGE, PDPropertyList.create(dictionary));
+
+                PDStructureElement figureStructElem = new PDStructureElement(StandardStructureTypes.Figure, treeRoot);
+                figureStructElem.setPage(currentPage);
 
                 if (hasAltText) {
                     figureStructElem.setAlternateDescription(imageCell.getAlternateText());

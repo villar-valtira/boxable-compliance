@@ -13,7 +13,8 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 	private final VerticalAlignment valign;
 
 	private String alternateText;
-	private String bottomText;
+	private HorizontalAlignment textAlign;
+	private float textMarginFromImage;
 
 	ImageCell(Row<T> row, float width, Image image, boolean isCalculated) {
 		super(row, width, null, isCalculated);
@@ -23,6 +24,8 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 		}
 		this.align = HorizontalAlignment.LEFT;
 		this.valign = VerticalAlignment.TOP;
+
+		this.textMarginFromImage = 10;
 	}
 
 	public void scaleToFit() {
@@ -38,11 +41,19 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 		}
 		this.align = align;
 		this.valign = valign;
+
+		this.textMarginFromImage = 10;
 	}
 
 	@Override
 	public float getTextHeight() {
-		return img.getHeight();
+		float height = img.getHeight();
+		if (!this.getText().isEmpty()) {
+			height += this.getParagraph().getHeight();
+			height += this.textMarginFromImage;
+		}
+
+		return height;
 	}
 
 	@Override
@@ -52,7 +63,11 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 	
 	@Override
 	public float getVerticalFreeSpace() {
-		return getInnerHeight() - img.getHeight();
+		if (!this.getText().isEmpty()) {
+			return getInnerHeight() - img.getHeight() - this.getParagraph().getHeight() - this.textMarginFromImage;
+		} else {
+			return getInnerHeight() - img.getHeight();
+		}
 	}
 
 
@@ -75,11 +90,20 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 		this.alternateText = alternateText;
 	}
 
-	public String getBottomText() {
-		return bottomText;
+
+	public HorizontalAlignment getTextAlign() {
+		return textAlign;
 	}
 
-	public void setBottomText(String bottomText) {
-		this.bottomText = bottomText;
+	public void setTextAlign(HorizontalAlignment textAlign) {
+		this.textAlign = textAlign;
+	}
+
+	public float getTextMarginFromImage() {
+		return textMarginFromImage;
+	}
+
+	public void setTextMarginFromImage(float textMarginFromImage) {
+		this.textMarginFromImage = textMarginFromImage;
 	}
 }
