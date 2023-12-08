@@ -757,4 +757,16 @@ public class Paragraph {
 		this.lineSpacing = lineSpacing;
 	}
 
+	public void removeEmptyLines() {
+		if (this.lines == null) return;
+		List<String> newLines = new ArrayList<>();
+
+		for (String line : lines) {
+			if (!line.isEmpty() && !line.equals(" ")) {
+				newLines.add(line);
+			}
+		}
+
+		this.lines = newLines;
+	}
 }

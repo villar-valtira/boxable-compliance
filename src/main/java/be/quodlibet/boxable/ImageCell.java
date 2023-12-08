@@ -15,6 +15,7 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 	private String alternateText;
 	private HorizontalAlignment textAlign;
 	private float textMarginFromImage;
+	private boolean removeEmptyLines;
 
 	ImageCell(Row<T> row, float width, Image image, boolean isCalculated) {
 		super(row, width, null, isCalculated);
@@ -26,6 +27,7 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 		this.valign = VerticalAlignment.TOP;
 
 		this.textMarginFromImage = 10;
+		this.removeEmptyLines = false;
 	}
 
 	public void scaleToFit() {
@@ -105,5 +107,13 @@ public class ImageCell<T extends PDPage> extends Cell<T> {
 
 	public void setTextMarginFromImage(float textMarginFromImage) {
 		this.textMarginFromImage = textMarginFromImage;
+	}
+
+	public boolean removeEmptyLines() {
+		return removeEmptyLines;
+	}
+
+	public void setRemoveEmptyLines(boolean removeEmptyLines) {
+		this.removeEmptyLines = removeEmptyLines;
 	}
 }

@@ -466,7 +466,11 @@ public abstract class Table<T extends PDPage> {
                         textStructureElement.setPage(currentPage);
                         textStructureElement.setElementIdentifier(UUID.randomUUID().toString());
 
-                        float aux = imageCell.getParagraph().write(this.tableContentStream, lineStartX, lineStartY);
+                        if (imageCell.removeEmptyLines()) {
+                            imageCell.getParagraph().removeEmptyLines();
+                        }
+
+                        imageCell.getParagraph().write(this.tableContentStream, lineStartX, lineStartY);
 
                         treeRoot.appendKid(textStructureElement);
 
