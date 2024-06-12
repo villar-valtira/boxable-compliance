@@ -10,8 +10,8 @@
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
-    <groupId>com.github.dhorions</groupId>
-    <artifactId>boxable</artifactId>
+    <groupId>com.github.villar-valtira</groupId>
+    <artifactId>boxable-compliance</artifactId>
     <version>1.7.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
